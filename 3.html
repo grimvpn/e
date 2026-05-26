@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundForge Web Studio Pro</title>
+    
+    <script src="https://unpkg.com/wavesurfer.js@7.7.15/dist/wavesurfer.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7.7.15/dist/plugins/regions.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7.7.15/dist/plugins/timeline.min.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #0f1115;
+            --bg-panel: #181b22;
+            --bg-surface: #222630;
+            --border-light: rgba(255, 255, 255, 0.08);
+            --accent-blue: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.2);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-light);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo span {
+            background: var(--accent-blue);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .btn {
+            background: var(--bg-surface);
+            color: var(--text-main);
+            border: 1px solid var(--border-light);
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn:hover {
+            background: #2d3342;
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        aside {
+            width: 320px;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border-light);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .panel-section {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .panel-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 6px;
+        }
+
+        .control-item {
+            margin-bottom: 12px;
+        }
+
+        .control-item:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 6px;
+            color: #d1d5db;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 8px;
+            color: white;
+            font-size: 13px;
+            outline: none;
+        }
+
+        input[type="number"]:focus {
+            border-color: var(--accent-blue);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: var(--bg-dark);
+            height: 6px;
+            border-radius: 3px;
+            border: 1px solid var(--border-light);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--text-main);
+            cursor: pointer;
+            margin-top: -5px;
+        }
+
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            gap: 16px;
+            background: var(--bg-dark);
+        }
+
+        .timeline-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #waveform {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.02);
+        }
+
+        #wave-timeline {
+            margin-top: 10px;
+        }
+
+        .upload-area {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-panel);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            z-index: 5;
+        }
+
+        .upload-area p {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 16px 20px;
+        }
+
+        .time-counter {
+            font-family: monospace;
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--accent-blue);
+            min-width: 120px;
+        }
+
+        .bottom-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .zoom-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 220px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">SoundForge <span>Pro</span></div>
+        <div>
+            <button class="btn" onclick="document.getElementById('audioFile').click()">Открыть файл</button>
+            <button class="btn btn-primary" id="exportBtn" disabled>Сохранить результат</button>
+            <input type="file" id="audioFile" accept="audio/*,video/mp4" style="display: none;">
+        </div>
+    </header>
+
+    <div class="main-container">
+        <aside>
+            <div class="panel-section">
+                <h3>Точная обрезка (сек)</h3>
+                <div class="control-item">
+                    <label>Начало фрагмента</label>
+                    <input type="number" id="inputStart" value="0" min="0" step="0.01">
+                </div>
+                <div class="control-item">
+                    <label>Конец фрагмента</label>
+                    <input type="number" id="inputEnd" value="0" min="0" step="0.01">
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Эффекты переходов</h3>
+                <div class="control-item">
+                    <label>Fade-In (Начало, сек)</label>
+                    <input type="number" id="fadeInDuration" value="0" min="0" max="10" step="0.5">
+                </div>
+                <div class="control-item">
+                    <label>Fade-Out (Затухание, сек)</label>
+                    <input type="number" id="fadeOutDuration" value="0" min="0" max="10" step="0.5">
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Мастер-шина</h3>
+                <div class="control-item">
+                    <label>Скорость (Speed)</label>
+                    <input type="range" id="speedSlider" min="0.5" max="2" step="0.05" value="1">
+                    <div id="speedVal" style="font-size: 11px; text-align: right; color: var(--text-muted); margin-top: 4px;">1.0x</div>
+                </div>
+                <div class="control-item">
+                    <label>Громкость превью</label>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.7">
+                </div>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <div class="timeline-card">
+                <div class="upload-area" id="uploadArea">
+                    <button class="btn btn-primary" onclick="document.getElementById('audioFile').click()">Выбрать аудио или MP4</button>
+                    <p>Интерактивный монтаж станет доступен после загрузки</p>
+                </div>
+                
+                <div id="waveform"></div>
+                <div id="wave-timeline"></div>
+            </div>
+
+            <div class="status-bar">
+                <div class="time-counter" id="timeDisplay">00:00.00</div>
+                
+                <div class="bottom-controls">
+                    <button class="btn" id="btnPlay" disabled>Play</button>
+                    <button class="btn" id="btnLoop" disabled>Петля: Выкл</button>
+                </div>
+
+                <div class="zoom-container">
+                    <span>Zoom:</span>
+                    <input type="range" id="zoomSlider" min="10" max="1000" value="10" disabled>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let wavesurfer = null;
+        let wsRegions = null;
+        let activeRegion = null;
+        let originalAudioBuffer = null;
+        let isLooping = false;
+
+        // Элементы UI
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('audioFile');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnLoop = document.getElementById('btnLoop');
+        const btnExport = document.getElementById('exportBtn');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const speedSlider = document.getElementById('speedSlider');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const inputStart = document.getElementById('inputStart');
+        const inputEnd = document.getElementById('inputEnd');
+
+        // Главная функция инициализации студии ПРИ загрузке файла
+        function initStudio(fileUrl) {
+            // Если старая копия была — уничтожаем её во избежание утечек памяти
+            if (wavesurfer) {
+                wavesurfer.destroy();
+            }
+
+            // Создаем ядро Wavesurfer
+            wavesurfer = WaveSurfer.create({
+                container: '#waveform',
+                waveColor: '#4b5563',
+                progressColor: '#3b82f6',
+                cursorColor: '#ef4444',
+                cursorWidth: 2,
+                height: 120,
+                barWidth: 2,
+                barGap: 1,
+                normalize: true,
+                plugins: [
+                    WaveSurfer.Timeline.create({ container: '#wave-timeline' })
+                ]
+            });
+
+            // Инициализируем регионы для обрезки (как на mp3cut)
+            wsRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
+
+            // --- НАВЕШИВАЕМ СОБЫТИЯ ПОСЛЕ ТОГО КАК ПЛЕЕР ТОЧНО СОЗДАН ---
+
+            wavesurfer.on('ready', () => {
+                const duration = wavesurfer.getDuration();
+                
+                // Настраиваем лимиты инпутов
+                inputStart.max = duration;
+                inputEnd.max = duration;
+                inputStart.value = 0;
+                inputEnd.value = duration.toFixed(2);
+
+                // Создаем интерактивное выделение
+                wsRegions.clearRegions();
+                activeRegion = wsRegions.addRegion({
+                    start: 0,
+                    end: duration * 0.75, // Выделяем 75% трека изначально
+                    color: 'rgba(59, 130, 246, 0.25)',
+                    drag: true,
+                    resize: true
+                });
+
+                // Разблокируем интерфейс
+                btnPlay.disabled = false;
+                btnLoop.disabled = false;
+                btnExport.disabled = false;
+                zoomSlider.disabled = false;
+                
+                wavesurfer.setVolume(volumeSlider.value);
+                zoomSlider.value = 10; // Сбрасываем зум
+            });
+
+            // Обновление таймера
+            wavesurfer.on('timeupdate', (currentTime) => {
+                let mins = Math.floor(currentTime / 60);
+                let secs = Math.floor(currentTime % 60);
+                let ms = Math.floor((currentTime % 1) * 100);
+                timeDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+                
+                // Логика зацикливания выделенного куска
+                if (isLooping && activeRegion && currentTime >= activeRegion.end) {
+                    wavesurfer.setTime(activeRegion.start);
+                }
+            });
+
+            // Синхронизация движения мыши по волне с текстовыми инпутами
+            wsRegions.on('region-updated', (region) => {
+                activeRegion = region;
+                inputStart.value = region.start.toFixed(2);
+                inputEnd.value = region.end.toFixed(2);
+            });
+
+            // Если кликаем вне зоны, возвращаем курсор в рамки обрезки
+            wavesurfer.on('interaction', () => {
+                setTimeout(() => {
+                    const cur = wavesurfer.getCurrentTime();
+                    if(activeRegion && (cur < activeRegion.start || cur > activeRegion.end)) {
+                        wavesurfer.setTime(activeRegion.start);
+                    }
+                }, 50);
+            });
+
+            // Загружаем сгенерированный Blob-адрес трека
+            wavesurfer.load(fileUrl);
+        }
+
+        // Слушатель загрузки файла
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            uploadArea.style.display = 'none';
+            const objectUrl = URL.createObjectURL(file);
+
+            // Параллельно декодируем PCM для нашей DSP-системы экспорта с фейдами
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                ctx.decodeAudioData(evt.target.result, function(buffer) {
+                    originalAudioBuffer = buffer;
+                }, function(err) {
+                    alert("Ошибка декодирования аудио данных.");
+                });
+            };
+            reader.readAsArrayBuffer(file);
+
+            // Запускаем инициализацию ядра
+            initStudio(objectUrl);
+        });
+
+        // Кнопка Play / Pause
+        btnPlay.addEventListener('click', () => {
+            if (!wavesurfer) return;
+            
+            if (wavesurfer.isPlaying()) {
+                wavesurfer.pause();
+                btnPlay.innerText = "Play";
+            } else {
+                const cur = wavesurfer.getCurrentTime();
+                if(activeRegion && (cur < activeRegion.start || cur > activeRegion.end)) {
+                    wavesurfer.setTime(activeRegion.start);
+                }
+                wavesurfer.play();
+                btnPlay.innerText = "Pause";
+            }
+        });
+
+        // Режим петли
+        btnLoop.addEventListener('click', () => {
+            isLooping = !isLooping;
+            btnLoop.innerText = isLooping ? "Петля: Вкл" : "Петля: Выкл";
+            btnLoop.style.borderColor = isLooping ? "var(--accent-blue)" : "var(--border-light)";
+        });
+
+        // Ручной ввод цифр в инпуты меняет синий ползунок обрезки
+        inputStart.addEventListener('input', () => {
+            if(activeRegion && wavesurfer) {
+                let val = Math.min(parseFloat(inputStart.value) || 0, activeRegion.end - 0.1);
+                activeRegion.setOptions({ start: val });
+            }
+        });
+
+        inputEnd.addEventListener('input', () => {
+            if(activeRegion && wavesurfer) {
+                let val = Math.max(parseFloat(inputEnd.value) || activeRegion.start + 0.1, activeRegion.start + 0.1);
+                activeRegion.setOptions({ end: Math.min(val, wavesurfer.getDuration()) });
+            }
+        });
+
+        // Интерактивный живой Zoom
+        zoomSlider.addEventListener('input', (e) => {
+            if (wavesurfer) {
+                wavesurfer.zoom(Number(e.target.value));
+            }
+        });
+
+        // Изменение скорости (влияет на pitch и speed воспроизведения)
+        speedSlider.addEventListener('input', (e) => {
+            if (wavesurfer) {
+                wavesurfer.setPlaybackRate(Number(e.target.value));
+                document.getElementById('speedVal').innerText = e.target.value + "x";
+            }
+        });
+
+        // Громкость
+        volumeSlider.addEventListener('input', (e) => {
+            if (wavesurfer) {
+                wavesurfer.setVolume(Number(e.target.value));
+            }
+        });
+
+        // РЕНДЕР И СБОРКА WAV С ФЕЙДАМИ
+        btnExport.addEventListener('click', () => {
+            if (!originalAudioBuffer || !activeRegion) return;
+
+            const ctx = new AudioContext();
+            const sampleRate = originalAudioBuffer.sampleRate;
+            
+            const startSec = activeRegion.start;
+            const endSec = activeRegion.end;
+            const durationSec = endSec - startSec;
+            
+            const startSample = Math.floor(startSec * sampleRate);
+            const numSamples = Math.floor(durationSec * sampleRate);
+
+            const croppedBuffer = ctx.createBuffer(
+                originalAudioBuffer.numberOfChannels,
+                numSamples,
+                sampleRate
+            );
+
+            const fadeInSec = parseFloat(document.getElementById('fadeInDuration').value) || 0;
+            const fadeOutSec = parseFloat(document.getElementById('fadeOutDuration').value) || 0;
+            const fadeInSamples = Math.floor(fadeInSec * sampleRate);
+            const fadeOutSamples = Math.floor(fadeOutSec * sampleRate);
+
+            for (let channel = 0; channel < originalAudioBuffer.numberOfChannels; channel++) {
+                const origData = originalAudioBuffer.getChannelData(channel);
+                const newData = croppedBuffer.getChannelData(channel);
+
+                for (let i = 0; i < numSamples; i++) {
+                    let sampleIndex = startSample + i;
+                    if (sampleIndex >= origData.length) break; 
+                    
+                    let sample = origData[sampleIndex];
+
+                    // Fade-In математика
+                    if (i < fadeInSamples && fadeInSamples > 0) {
+                        sample *= (i / fadeInSamples);
+                    }
+                    // Fade-Out математика
+                    if (i > (numSamples - fadeOutSamples) && fadeOutSamples > 0) {
+                        sample *= ((numSamples - i) / fadeOutSamples);
+                    }
+
+                    newData[i] = sample;
+                }
+            }
+
+            const wavBytes = bufferToWav(croppedBuffer);
+            const blob = new Blob([wavBytes], { type: 'audio/wav' });
+            const blobUrl = URL.createObjectURL(blob);
+
+            const downloadLink = document.createElement('a');
+            downloadLink.href = blobUrl;
+            downloadLink.download = 'soundforge_export.wav';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            
+            document.body.removeChild(downloadLink);
+            URL.revokeObjectURL(blobUrl);
+        });
+
+        // Бинарный конвертер PCM -> WAV
+        function bufferToWav(buffer) {
+            const numOfChan = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = 1; 
+            const bitDepth = 16;
+            
+            let result;
+            if (numOfChan === 2) {
+                result = interleave(buffer.getChannelData(0), buffer.getChannelData(1));
+            } else {
+                result = buffer.getChannelData(0);
+            }
+            
+            const bufferArray = new ArrayBuffer(44 + result.length * 2);
+            const view = new DataView(bufferArray);
+            
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + result.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, format, true);
+            view.setUint16(22, numOfChan, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * numOfChan * (bitDepth / 8), true);
+            view.setUint16(32, numOfChan * (bitDepth / 8), true);
+            view.setUint16(34, bitDepth, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, result.length * 2, true);
+            
+            let index = 44;
+            for (let i = 0; i < result.length; i++) {
+                let sample = Math.max(-1, Math.min(1, result[i]));
+                sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                view.setInt16(index, sample, true);
+                index += 2;
+            }
+            return bufferArray;
+        }
+
+        function interleave(inputL, inputR) {
+            const length = inputL.length + inputR.length;
+            const result = new Float32Array(length);
+            let index = 0; let inputIndex = 0;
+            while (index < length) {
+                result[index++] = inputL[inputIndex];
+                result[index++] = inputR[inputIndex];
+                inputIndex++;
+            }
+            return result;
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+    </script>
+</body>
+</html>
