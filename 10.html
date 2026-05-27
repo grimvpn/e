@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>SoundForge Web Studio Pro v2</title>
+    <script src="https://unpkg.com/wavesurfer.js@7.7.15/dist/wavesurfer.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7.7.15/dist/plugins/regions.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7.7.15/dist/plugins/timeline.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #0b0e11;
+            --bg-panel: #14171c;
+            --bg-surface: #1e222a;
+            --accent: #3b82f6;
+            --accent-red: #ef4444;
+            --text: #e5e7eb;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-dark); color: var(--text); font-family: 'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Стильный скроллбар для контейнера волны */
+        #waveform-wrapper ::-webkit-scrollbar { height: 8px; }
+        #waveform-wrapper ::-webkit-scrollbar-track { background: var(--bg-dark); border-radius: 4px; }
+        #waveform-wrapper ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; border: 1px solid var(--border); }
+        #waveform-wrapper ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        header { background: var(--bg-panel); padding: 10px 20px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+        /* Боковая панель */
+        aside { width: 300px; background: var(--bg-panel); border-right: 1px solid var(--border); padding: 15px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+        .panel-block { background: var(--bg-surface); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .panel-block h3 { font-size: 11px; text-transform: uppercase; color: #9ca3af; margin-bottom: 10px; }
+        label { display: block; font-size: 12px; margin: 8px 0 4px; color: #9ca3af; }
+        input, select { width: 100%; background: #0b0e11; border: 1px solid var(--border); color: white; padding: 6px; border-radius: 4px; font-size: 13px; }
+
+        /* Рабочая область */
+        .editor-zone { flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 15px; position: relative; }
+        
+        /* Контейнер волны */
+        .wave-card { 
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; 
+            padding: 10px; position: relative; display: flex; flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        #waveform-wrapper { position: relative; width: 100%; overflow: hidden; }
+        
+        /* Визуальные фейды на самой дорожке */
+        .fade-overlay {
+            position: absolute; top: 0; bottom: 0; pointer-events: none; z-index: 5; height: 100%;
+        }
+        #fade-in-vis { left: 0; background: linear-gradient(to right, var(--bg-panel) 0%, transparent 100%); width: 0; }
+        #fade-out-vis { right: 0; background: linear-gradient(to left, var(--bg-panel) 0%, transparent 100%); width: 0; }
+
+        /* Панель управления ПЛОТНО к дорожке */
+        .transport-bar {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
+            display: flex; align-items: center; justify-content: space-between; padding: 10px 20px;
+        }
+
+        .btn { 
+            background: #374151; color: white; border: none; padding: 8px 16px; 
+            border-radius: 6px; cursor: pointer; font-size: 13px; transition: 0.2s;
+        }
+        .btn:hover { background: #4b5563; }
+        .btn-primary { background: var(--accent); }
+        .btn-primary:hover { background: #2563eb; }
+        
+        .active-btn { background: var(--accent) !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); }
+
+        .timer { font-family: 'Monaco', monospace; font-size: 24px; color: var(--accent); }
+
+        /* Лоадер для экспорта */
+        #loader {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 100; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="loader">
+    <div class="spinner"></div>
+    <p>Обработка аудио...</p>
+    <small style="margin-top: 10px; color: #9ca3af;">Пожалуйста, не закрывайте вкладку</small>
+</div>
+
+<header>
+    <div style="font-weight: bold; letter-spacing: 1px;">SOUNDFORGE <span style="color: var(--accent)">PRO</span></div>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn" onclick="document.getElementById('audioFile').click()">Открыть</button>
+        <select id="exportFormat" style="width: 80px;">
+            <option value="mp3">MP3</option>
+            <option value="wav">WAV</option>
+        </select>
+        <button class="btn btn-primary" id="exportBtn" disabled>Экспорт</button>
+    </div>
+    <input type="file" id="audioFile" accept="audio/*,video/mp4" style="display: none;">
+</header>
+
+<div class="main-layout">
+    <aside>
+        <div class="panel-block">
+            <h3>Режим</h3>
+            <div style="display: flex; gap: 4px;">
+                <button id="modeKeep" class="btn active-btn" style="flex:1" onclick="setMode('keep')">Оставить</button>
+                <button id="modeCut" class="btn" style="flex:1" onclick="setMode('remove')">Вырезать</button>
+            </div>
+        </div>
+
+        <div class="panel-block">
+            <h3>Плавность (Fades)</h3>
+            <label>Начало (сек)</label>
+            <input type="number" id="fadeInDur" value="0" step="0.1" min="0" oninput="updateFadeVisuals()">
+            <label>Конец (сек)</label>
+            <input type="number" id="fadeOutDur" value="0" step="0.1" min="0" oninput="updateFadeVisuals()">
+        </div>
+
+        <div class="panel-block">
+            <h3>Усиление (Boost)</h3>
+            <label id="volLabel">Громкость: 100%</label>
+            <input type="range" id="volSlider" min="0" max="3" step="0.1" value="1">
+        </div>
+
+        <div class="panel-block">
+            <h3>Зум</h3>
+            <input type="range" id="zoomSlider" min="10" max="500" value="20">
+        </div>
+    </aside>
+
+    <main class="editor-zone">
+        <div class="wave-card">
+            <div id="waveform-wrapper">
+                <div id="fade-in-vis" class="fade-overlay"></div>
+                <div id="fade-out-vis" class="fade-overlay"></div>
+                <div id="waveform"></div>
+                <div id="wave-timeline"></div>
+            </div>
+        </div>
+
+        <div class="transport-bar">
+            <div class="timer" id="timer">00:00.00</div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" id="playBtn" style="min-width: 100px;">Play</button>
+                <button class="btn" id="loopBtn">Петля: Выкл</button>
+            </div>
+            <div style="font-size: 11px; color: #6b7280; width: 120px;">Навигация: Свободная</div>
+        </div>
+    </main>
+</div>
+
+<script>
+    let wavesurfer, wsRegions, activeRegion, originalBuffer;
+    let editMode = 'keep';
+    let isLooping = false;
+
+    // Инициализация
+    function initWS(url) {
+        if (wavesurfer) wavesurfer.destroy();
+        
+        wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#4b5563',
+            progressColor: '#3b82f6',
+            cursorColor: '#ffffff',
+            height: 180,
+            barWidth: 2,
+            minPxPerSec: 20,
+            autoCenter: false, // Отключает прыжки экрана за курсором
+            hideScrollbar: false,
+            plugins: [ WaveSurfer.Timeline.create({ container: '#wave-timeline' }) ]
+        });
+
+        wsRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
+
+        wavesurfer.on('ready', () => {
+            const dur = wavesurfer.getDuration();
+            activeRegion = wsRegions.addRegion({
+                start: 0, end: dur * 0.3,
+                color: 'rgba(59, 130, 246, 0.2)',
+                drag: true, resize: true
+            });
+            document.getElementById('exportBtn').disabled = false;
+            updateFadeVisuals();
+        });
+
+        wavesurfer.on('timeupdate', (t) => {
+            updateTimer(t);
+            checkPlaybackLogic(t);
+        });
+
+        wavesurfer.load(url);
+    }
+
+    function checkPlaybackLogic(t) {
+        if (!activeRegion) return;
+        const vol = document.getElementById('volSlider').value;
+        
+        // Логика проигрывания
+        if (editMode === 'keep') {
+            if (t >= activeRegion.end) {
+                if (isLooping) wavesurfer.setTime(activeRegion.start);
+                else { wavesurfer.pause(); document.getElementById('playBtn').innerText = 'Play'; }
+            }
+        } else {
+            if (t >= activeRegion.start && t < activeRegion.end) wavesurfer.setTime(activeRegion.end);
+        }
+        
+        // Математика громкости в реальном времени (Fades + Boost)
+        let gain = calculateGain(t);
+        wavesurfer.setVolume(gain * vol);
+    }
+
+    function calculateGain(t) {
+        const fIn = parseFloat(document.getElementById('fadeInDur').value) || 0;
+        const fOut = parseFloat(document.getElementById('fadeOutDur').value) || 0;
+        
+        if (editMode === 'keep') {
+            if (t < activeRegion.start + fIn) return Math.max(0, (t - activeRegion.start) / fIn);
+            if (t > activeRegion.end - fOut) return Math.max(0, (activeRegion.end - t) / fOut);
+            if (t < activeRegion.start || t > activeRegion.end) return 0;
+        }
+        return 1;
+    }
+
+    // Визуализация фейдов на дорожке
+    function updateFadeVisuals() {
+        if (!wavesurfer || !activeRegion) return;
+        const zoom = wavesurfer.options.minPxPerSec;
+        const fIn = document.getElementById('fadeInDur').value;
+        const fOut = document.getElementById('fadeOutDur').value;
+
+        // В режиме Keep фейды привязаны к региону
+        const visIn = document.getElementById('fade-in-vis');
+        const visOut = document.getElementById('fade-out-vis');
+
+        if(editMode === 'keep') {
+            visIn.style.left = (activeRegion.start * zoom) + 'px';
+            visIn.style.width = (fIn * zoom) + 'px';
+            
+            visOut.style.right = 'auto';
+            visOut.style.left = ((activeRegion.end - fOut) * zoom) + 'px';
+            visOut.style.width = (fOut * zoom) + 'px';
+            visOut.style.background = 'linear-gradient(to left, var(--bg-panel) 0%, transparent 100%)';
+        } else {
+            // В режиме Cut фейды от краев всего файла
+            visIn.style.left = '0';
+            visIn.style.width = (fIn * zoom) + 'px';
+            visOut.style.left = 'auto';
+            visOut.style.right = '0';
+            visOut.style.width = (fOut * zoom) + 'px';
+        }
+    }
+
+    function setMode(m) {
+        editMode = m;
+        document.getElementById('modeKeep').classList.toggle('active-btn', m === 'keep');
+        document.getElementById('modeCut').classList.toggle('active-btn', m === 'remove');
+        activeRegion.setOptions({ color: m === 'keep' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.3)' });
+        updateFadeVisuals();
+    }
+
+    document.getElementById('zoomSlider').oninput = (e) => {
+        wavesurfer.zoom(e.target.value);
+        updateFadeVisuals();
+    };
+
+    document.getElementById('volSlider').oninput = (e) => {
+        document.getElementById('volLabel').innerText = `Громкость: ${Math.round(e.target.value * 100)}%`;
+    };
+
+    document.getElementById('playBtn').onclick = () => {
+        wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
+        document.getElementById('playBtn').innerText = wavesurfer.isPlaying() ? 'Pause' : 'Play';
+    };
+
+    document.getElementById('loopBtn').onclick = (e) => {
+        isLooping = !isLooping;
+        e.target.classList.toggle('active-btn', isLooping);
+        e.target.innerText = isLooping ? 'Петля: Вкл' : 'Петля: Выкл';
+    };
+
+    // Экспорт
+    document.getElementById('exportBtn').onclick = async () => {
+        document.getElementById('loader').style.display = 'flex';
+        // Небольшая задержка, чтобы UI успел показать лоадер перед тяжелым циклом
+        setTimeout(async () => {
+            await startExport();
+            document.getElementById('loader').style.display = 'none';
+        }, 150);
+    };
+
+    async function startExport() {
+        const ctx = new AudioContext();
+        const sr = originalBuffer.sampleRate;
+        const { start, end } = activeRegion;
+        
+        let outLength = editMode === 'keep' ? (end - start) : (originalBuffer.duration - (end - start));
+        const outBuffer = ctx.createBuffer(originalBuffer.numberOfChannels, Math.floor(outLength * sr), sr);
+        
+        const fInSmp = (parseFloat(document.getElementById('fadeInDur').value) || 0) * sr;
+        const fOutSmp = (parseFloat(document.getElementById('fadeOutDur').value) || 0) * sr;
+        const boost = parseFloat(document.getElementById('volSlider').value);
+
+        for (let ch = 0; ch < originalBuffer.numberOfChannels; ch++) {
+            const inData = originalBuffer.getChannelData(ch);
+            const outData = outBuffer.getChannelData(ch);
+            let ptr = 0;
+
+            if (editMode === 'keep') {
+                const startSmp = Math.floor(start * sr);
+                for (let i = 0; i < outData.length; i++) {
+                    let s = inData[startSmp + i] * boost;
+                    outData[i] = applyFade(s, i, outData.length, fInSmp, fOutSmp);
+                }
+            } else {
+                const startSmp = Math.floor(start * sr);
+                for (let i = 0; i < startSmp; i++) {
+                    outData[ptr] = inData[i] * boost;
+                    outData[ptr] = applyFade(outData[ptr], ptr, outBuffer.length, fInSmp, fOutSmp);
+                    ptr++;
+                }
+                const endSmp = Math.floor(end * sr);
+                for (let i = endSmp; i < inData.length; i++) {
+                    outData[ptr] = inData[i] * boost;
+                    outData[ptr] = applyFade(outData[ptr], ptr, outBuffer.length, fInSmp, fOutSmp);
+                    ptr++;
+                }
+            }
+        }
+
+        const format = document.getElementById('exportFormat').value;
+        if(format === 'mp3') exportMP3(outBuffer); else exportWAV(outBuffer);
+    }
+
+    function applyFade(s, i, total, fIn, fOut) {
+        if (i < fIn) return s * (i / fIn);
+        if (i > total - fOut) return s * ((total - i) / fOut);
+        return s;
+    }
+
+    function updateTimer(t) {
+        const m = Math.floor(t / 60), s = Math.floor(t % 60), ms = Math.floor((t % 1) * 100);
+        document.getElementById('timer').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${ms.toString().padStart(2,'0')}`;
+    }
+
+    document.getElementById('audioFile').onchange = (e) => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            new AudioContext().decodeAudioData(ev.target.result, (buf) => {
+                originalBuffer = buf;
+                initWS(URL.createObjectURL(file));
+            });
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    function exportWAV(buffer) {
+        const wav = audioBufferToWav(buffer);
+        download(new Blob([wav], {type:'audio/wav'}), 'result.wav');
+    }
+
+    function exportMP3(buffer) {
+        const encoder = new lamejs.Mp3Encoder(buffer.numberOfChannels, buffer.sampleRate, 192);
+        const l = buffer.getChannelData(0);
+        const r = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : l;
+        const mp3Data = [];
+        const toInt16 = f => f < 0 ? f * 32768 : f * 32767;
+        const step = 1152;
+        for(let i=0; i<l.length; i+=step) {
+            const lChunk = new Int16Array(step), rChunk = new Int16Array(step);
+            for(let j=0; j<step; j++) { lChunk[j] = toInt16(l[i+j] || 0); rChunk[j] = toInt16(r[i+j] || 0); }
+            const mp3buf = encoder.encodeBuffer(lChunk, rChunk);
+            if(mp3buf.length > 0) mp3Data.push(mp3buf);
+        }
+        mp3Data.push(encoder.flush());
+        download(new Blob(mp3Data, {type:'audio/mp3'}), 'result.mp3');
+    }
+
+    function download(blob, name) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    }
+
+    function audioBufferToWav(buffer) {
+        let numOfChan = buffer.numberOfChannels, length = buffer.length * numOfChan * 2 + 44, bufferArr = new ArrayBuffer(length), view = new DataView(bufferArr), pos = 0;
+        const setUint32 = (d) => { view.setUint32(pos, d, true); pos += 4; };
+        const setUint16 = (d) => { view.setUint16(pos, d, true); pos += 2; };
+        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+        setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+        setUint32(buffer.sampleRate); setUint32(buffer.sampleRate * 2 * numOfChan);
+        setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164); setUint32(length - pos - 4);
+        for(let offset=0; offset < buffer.length; offset++) {
+            for(let i=0; i<numOfChan; i++) {
+                let s = Math.max(-1, Math.min(1, buffer.getChannelData(i)[offset]));
+                view.setInt16(pos, s < 0 ? s * 32768 : s * 32767, true); pos += 2;
+            }
+        }
+        return bufferArr;
+    }
+</script>
+</body>
+</html>
